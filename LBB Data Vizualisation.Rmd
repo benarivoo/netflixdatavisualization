@@ -1,0 +1,324 @@
+---
+title: "LBB R Data Visualization - Benarivo"
+author: "Benarivo"
+date: "19/04/2020"
+output: 
+  html_document:
+    highlight: breezedark
+    number_section: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r,warning=FALSE,message=FALSE}
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+```
+
+In this project, we will visualize netflix data and find insights from the data.
+
+# Import Data
+
+First we need to import the data using 'read.csv'.
+```{r}
+netflix <- read.csv("netflix_titles.csv",na.strings=c("","NA"))
+```
+
+# Inspect Data
+
+After importing the data, we need to explore the dataset.
+
+Now let's print the first 10 rows from the dataset.
+```{r}
+head(netflix, 10)
+```
+
+Additionally, let's print 10 last rows from our dataset.
+```{r}
+tail(netflix, 10)
+```
+
+From above, we can see that the data has these variables:
+
+1. show_id: Unique ID for every Movie / TV Show
+2. type: Identifier - A Movie or TV Show
+3. title: Title of the Movie / Tv Show
+4. director: Director of the Movie
+5. cast: Actors involved in the movie / show
+6. country: Country where the movie / show was produced
+7. date_added: Date it was added on Netflix
+8. release_year: Actual Release year of the move / show
+9. rating: TV Rating of the movie / show
+10. duration: Total Duration - in minutes or number of seasons
+11. listed_in: Genre
+12. description: The summary description
+
+# Data Cleaning
+
+In this analyisis, unique ID for every movie or tv show is not needed. Thus 'show_id' shall be removed.
+
+```{r}
+netflix <- netflix %>% 
+  select(-show_id)
+```
+
+
+Additionally, we can print the information of the data type of each variable using 'str()':
+```{r}
+str(netflix)
+```
+
+From above, we can see several changes should be implemented: 
+1. 'title' to be changed as character
+2. 'director' to be changed as character
+3. 'cast' to be changed as character
+4. 'date_added' to be changed as date
+5. 'release_year' to be changed as factor
+6. 'description' to be changed as character
+
+```{r}
+netflix$title <- as.character(netflix$title)
+netflix$director <- as.character(netflix$director)
+netflix$cast <- as.character(netflix$cast)
+netflix$date_added <- mdy(netflix$date_added)
+netflix$release_year <- as.factor(netflix$release_year)
+netflix$description <- as.character(netflix$description)
+```
+
+Let's check the changes we have made:
+```{r}
+head(netflix,10)
+```
+
+```{r}
+str(netflix)
+```
+The changes have been implemented to our data. 
+
+Now, we need to check the missing data data. 
+```{r}
+colSums(is.na(netflix))
+```
+
+In this case to analyse the data, it is okay to have missing data in the 'director' and 'cast'. However, we need the data of the 'country', 'date_added' and 'rating'.
+Therefore we will remove the data with missing information of 'country', 'date_added' and 'rating'.
+
+```{r}
+netflix <- netflix %>%  drop_na(country, date_added, rating)
+```
+
+```{r}
+colSums(is.na(netflix))
+```
+Now, we do not have missing 'date_added', 'country', and 'rating' values 
+
+
+# Data Visualization
+
+In this data exploration section, we will answer below questions through visualization:
+
+- Q1: In which countries most of netflix content were produced?
+- Q2: What are the most produced movie or tv show's genres on netflix?
+- Q3: What is the trend of the content type released on Netflix?
+
+## Question 1 (Q1)
+
+First, we will analyse our data to answer Q1.
+
+Q1: In which countries most of netflix content were produced?
+
+We need to count the number of contents per produced per country
+```{r}
+netflix_country <- netflix %>% 
+  group_by(country) %>% 
+  summarise(count = n())
+netflix_country
+```
+
+There are several movies which are produced in several countries. We will consider the combination of countries as separate factor levels. 
+
+We only need the top 10 of to check in which country most of the contents are produced.
+```{r}
+netflix_country <- netflix_country %>% 
+  arrange(-count) %>% 
+  head(10)
+```
+
+
+```{r}
+ggplot(data = netflix_country, mapping = aes(x = reorder(country, count), 
+                                       y = count)) +
+  geom_col(aes(fill = count)) +
+  
+  labs( title = "Countries with Most Produced Netflix Contents",
+        y = "Number of Contents", x = "Country", 
+        caption = "source: kaggle") +
+  
+  coord_flip() +
+  theme(legend.position = "top")
+```
+From above, most of the movies and TV shows are produced in the United States, India and United Kingdom. 
+
+Let's check the number of movies produced per country and choose the top 10.
+```{r}
+netflix_country <- netflix %>% 
+  filter(type == "Movie") %>% 
+  group_by(country) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  head(10)
+```
+
+We then visualize the data:
+```{r}
+ggplot(data = netflix_country, mapping = aes(x = reorder(country, count), 
+                                       y = count)) +
+  geom_col(aes(fill = count)) +
+  
+  labs( title = "Countries with Most Produced Netflix Movies",
+        y = "Number of Contents", x = "Country", 
+        caption = "source: kaggle") +
+  
+  coord_flip() +
+  theme(legend.position = "top")
+```
+Most movies are produced in the U.S., India and the U.K. This is similar with the overall production of Netflix contents. However, Canada has moved to the 4th position and Spain to the 5th position. 
+
+Let's check the number of TV shows produced per country and choose the top 10.
+```{r}
+netflix_country <- netflix %>% 
+  filter(type == "TV Show") %>% 
+  group_by(country) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  head(10)
+```
+
+We then visualize the data:
+```{r}
+ggplot(data = netflix_country, mapping = aes(x = reorder(country, count), 
+                                       y = count)) +
+  geom_col(aes(fill = count)) +
+  
+  labs( title = "Countries with Most Produced Netflix TV Shows",
+        y = "Number of Contents", x = "Country", 
+        caption = "source: kaggle") +
+  
+  coord_flip() +
+  theme(legend.position = "top")
+```
+From the graph we can see that India is not on the top 3 countries in which Netflix TV shows are produced. Therefore, we can additionally conclude that India produced more movies than TV shows. 
+
+## Question 2 (Q2)
+
+We will now try to answer below question through visualization
+
+Q2: What are the most produced movie or tv show's genres on netflix?
+
+Let's pre-process the data and count the number of contents per genre
+```{r}
+netflix_genre <- netflix %>% 
+  group_by(listed_in) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count) %>% 
+  head(10)
+```
+
+We then visualize the data:
+```{r}
+ggplot(data = netflix_genre, mapping = aes(x = reorder(listed_in, count), 
+                                       y = count)) +
+  geom_col(aes(fill = count)) +
+  
+  labs( title = "Most Produced Genre on Netflix",
+        y = "Number of Contents", x = "Country", 
+        caption = "source: kaggle") +
+  
+  coord_flip() +
+  theme(legend.position = "top")
+```
+The most produced genre on Netflix is Documentaries. 
+
+## Question 3 (Q3)
+
+We will noe analyse:
+
+Q3: What is the trend of the content type released on Netflix?
+
+Let's process the data to count the number of released Movies and TV Shoes on Netflix. 
+
+First, we will process the data to be able to visualize number of released Movies over the year. 
+```{r}
+netflix_trend_movie<- netflix %>% 
+  filter(type == "Movie") 
+
+netflix_trend_movie$date_added <- format(as.Date(netflix_trend_movie$date_added, format="%Y-%m-%d"),"%Y")
+
+netflix_trend_movie <- netflix_trend_movie %>% 
+  group_by(date_added) %>% 
+  summarise(count = n())
+```
+
+Second, we will process the data to be able to visualize number of released TV Shows over the year. 
+```{r}
+netflix_trend_tv<- netflix %>% 
+  filter(type == "TV Show") 
+
+netflix_trend_tv$date_added <- format(as.Date(netflix_trend_tv$date_added, format="%Y-%m-%d"),"%Y")
+
+netflix_trend_tv <- netflix_trend_tv %>% 
+  group_by(date_added) %>% 
+  summarise(count = n())
+```
+
+Now let's visualize both data:
+```{r}
+# For Movies:
+ggplot(data = netflix_trend_movie, mapping = aes(x = date_added, 
+                                       y = count)) +
+  geom_col(fill = "darkblue") +
+  
+  labs( title = "Number of Released Movie on Netflix",
+        y = "Number of Movies", x = "Year", 
+        caption = "source: kaggle") +
+  theme_minimal()
+```
+
+```{r}
+# For TV Shows:
+ggplot(data = netflix_trend_tv, mapping = aes(x = date_added, 
+                                       y = count)) +
+  geom_col(fill = "firebrick") +
+  
+  labs( title = "Number of Released TV Shows on Netflix",
+        y = "Number of TV Shows", x = "Year", 
+        caption = "source: kaggle") +
+  theme_minimal()
+```
+
+From both graphs, we can see that in the number of movies released on netflix increased significatly in 2017, and now on a constant growth.
+On the other hand, the number of TV Shows has been growing constantly until 2019 and the number increased sharply in 2019. 
+
+# Conclusion
+
+From visualizing and answering the questions in the last chapter, we can conclude:
+
+1. Most of netflix contents (Movies and TV Shows) are produced in the United States, India and United Kingdom. 
+2. Most of movies on Netflix are produced in the United States, India and United Kingdom. 
+3. Most of TV Shows on Netflix are produced in the United States, United Kingdom and Japan. 
+4. Most released contents genre on Netflix are Documentaries, Stand Up comedies and Drama.
+5. The number of movies released on netflix increased significatly in 2017, and now on a constant growth. 
+6. The number of TV Shows has been growing constantly until 2019 and the number increased sharply in 2019. 
